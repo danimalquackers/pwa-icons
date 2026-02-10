@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 set -euo pipefail
 
 # Configuration
@@ -6,8 +6,16 @@ CURL_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) 
 ICON_DIR="${2:-${ICON_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/webapp-icons}}"
 mkdir -p "$ICON_DIR"
 
+log() {
+  echo -e "[INFO] $*" >&2
+}
+
+error() {
+  echo -e "[ERROR] $*" >&2
+}
+
 if [ -z "${1:-}" ]; then
-  echo "Usage: $0 <base-domain> [output-dir]"
+  error "Usage: $0 <base-domain> [output-dir]"
   exit 1
 fi
 
@@ -58,21 +66,23 @@ fetch_pwa_manifest() {
   local manifest_href
   manifest_href=$(grep -ioP '<link[^>]+rel=["'\'']manifest["'\''][^>]*>' "$html_file" | \
                   grep -ioP 'href=["'\'']\K[^"'\'' >]+' | head -n 1 || true)
-  
-  cat "${html_file}"
+
+  log "Manifest href found: ${manifest_href:-none}"
+
   # If no manifest link is found in the HTML, this method fails
   [[ -z "$manifest_href" ]] && return 1
 
   # Resolve the manifest URL (could be relative to the base URL)
   local manifest_url
   manifest_url=$(resolve_url "$manifest_href" "$base_url")
+  log "Resolved manifest URL: $manifest_url"
 
   # Create a temporary manifest file
   local tmp_manifest
   tmp_manifest=$(mktemp)
 
   # Download the manifest JSON file
-  if curl -sL "$manifest_url" -o "$tmp_manifest"; then
+  if curl -sSL "$manifest_url" -o "$tmp_manifest"; then
     # Extract all "src" values from the manifest using regex.
     # Note: This is a simple grep-based parse which works for standard manifest structures.
     mapfile -t icon_srcs < <(grep -oP '"src"\s*:\s*"\K[^"]+' "$tmp_manifest" || true)
@@ -85,8 +95,9 @@ fetch_pwa_manifest() {
       icon_url=$(resolve_url "$src" "$manifest_base")
       
       # Try to download the specific icon and verify if it's a valid image
-      if curl -sL "$icon_url" -o "$target" && is_valid_image "$target"; then
+      if curl -sSL "$icon_url" -o "$target" && is_valid_image "$target"; then
         # Successfully found an icon! Clean up and return
+        log "Successfully downloaded icon from manifest: $icon_url"
         rm -f "$tmp_manifest"
         return 0
       fi
@@ -119,8 +130,10 @@ fetch_html_icon() {
   local resolved_url
   resolved_url=$(resolve_url "$link_href" "$base_url")
   
+  log "Found HTML icon link: $resolved_url"
+
   # Verify if the downloaded file is actually an image
-  if curl -sL "$resolved_url" -o "$target" && is_valid_image "$target"; then
+  if curl -sSL "$resolved_url" -o "$target" && is_valid_image "$target"; then
     return 0
   fi
   return 1
@@ -132,7 +145,7 @@ fetch_direct_favicon() {
   local domain="$1" base_url="$2" target="$3"
   
   # Many sites still host a favicon at the root for legacy compatibility
-  if curl -sL "$base_url/favicon.ico" -o "$target" && is_valid_image "$target"; then
+  if curl -sSL "$base_url/favicon.ico" -o "$target" && is_valid_image "$target"; then
     return 0
   fi
   return 1
@@ -148,7 +161,7 @@ fetch_google_s2() {
   local google_url="https://www.google.com/s2/favicons?domain=${domain}&sz=128"
   
   # Fetch and validate the image from the external service
-  if curl -sL "$google_url" -o "$target" && is_valid_image "$target"; then
+  if curl -sSL "$google_url" -o "$target" && is_valid_image "$target"; then
     return 0
   fi
   return 1
@@ -156,13 +169,14 @@ fetch_google_s2() {
 
 # Download the main page HTML once to be used by scrapers
 TMP_HTML=$(mktemp)
-curl -sL -A "$CURL_UA" "$BASE_URL" -o "$TMP_HTML" || true
+curl -sSL -A "$CURL_UA" "$BASE_URL" -o "$TMP_HTML" || true
 
 TMP_ICON=$(mktemp)
 SUCCESS=false
 
 # Priority-ordered list of methods to attempt
 for method in "fetch_pwa_manifest" "fetch_html_icon" "fetch_direct_favicon" "fetch_google_s2"; do
+  log "Attempting method: $method"
   # Scrapers require the HTML file; direct/service methods do not
   if [[ "$method" == fetch_pwa_manifest || "$method" == fetch_html_icon ]]; then
       "$method" "$DOMAIN" "$BASE_URL" "$TMP_ICON" "$TMP_HTML" && SUCCESS=true
@@ -181,5 +195,5 @@ done
 
 # Cleanup on failure
 rm -f "$TMP_HTML" "$TMP_ICON"
-echo "Failed to download icon for $DOMAIN"
+error "Failed to download icon for $DOMAIN"
 exit 1

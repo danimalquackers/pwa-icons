@@ -20,7 +20,7 @@ A lightweight, robust tool for fetching high-quality icons for web applications 
 Add this to your `flake.nix` inputs:
 
 ```nix
-inputs.pwa-icon-downloader.url = "github:danimalquackers/pwa-icon-downloader";
+inputs.pwa-icons.url = "github:danimalquackers/pwa-icons";
 ```
 
 ## Usage
@@ -30,14 +30,14 @@ inputs.pwa-icon-downloader.url = "github:danimalquackers/pwa-icon-downloader";
 Import the module and use the `downloadWebAppIcon` helper in your desktop items:
 
 ```nix
-{ pkgs, pwa-icon-downloader, ... }: {
-  imports = [ pwa-icon-downloader.homeManagerModules.default ];
+{ pkgs, pwa-icons, ... }: {
+  imports = [ pwa-icons.homeManagerModules.default ];
 
   home.packages = [
     (pkgs.makeDesktopItem {
       name = "YouTube Music";
       exec = "firefox ...";
-      icon = pwa-icon-downloader.downloadWebAppIcon {
+      icon = pwa-icons.downloadWebAppIcon {
         domain = "music.youtube.com";
         hash = lib.fakeHash; # Nix will provide the correct hash on first run
       };
@@ -49,8 +49,8 @@ Import the module and use the `downloadWebAppIcon` helper in your desktop items:
 ### Nixpkgs Overlay
 
 ```nix
-{ pkgs, pwa-icon-downloader, ... }: {
-  nixpkgs.overlays = [ pwa-icon-downloader.overlays.default ];
+{ pkgs, pwa-icons, ... }: {
+  nixpkgs.overlays = [ pwa-icons.overlays.default ];
 
   # Use via pkgs
   icon = pkgs.downloadWebAppIcon {

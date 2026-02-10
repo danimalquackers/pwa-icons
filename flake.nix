@@ -38,11 +38,15 @@
           name = "${builtins.replaceStrings [ ":" "/" " " ] [ "_" "_" "_" ] domain}-icon.ico";
 
           nativeBuildInputs = with pkgs; [
-            curl
+            # Webpage analysis and parsing tools
             file
             gnugrep
             gnused
             coreutils
+
+            # Tools for fetching webpages and icons
+            curl
+            cacert
           ];
 
           # This makes it a Fixed-Output Derivation (FOD), which has network access
@@ -50,13 +54,8 @@
           outputHashAlgo = if finalHash == "" then null else null; # Nix handles this if hash is provided
           outputHashMode = "flat";
 
-          # Run the script. We pass "." as the output directory.
-          # The script will create a .ico file, which we then move to $out.
           buildCommand = ''
-            export HOME=$TMPDIR
-            ${downloader}/bin/pwa-icon-downloader "${domain}" .
-            # Find the generated ico file and move it to the output path
-            mv *.ico "$out"
+            ${downloader}/bin/pwa-icons "${domain}" "$out"
           '';
         };
     in
@@ -68,14 +67,17 @@
         in
         {
           default = pkgs.writeShellApplication {
-            name = "pwa-icon-downloader";
+            name = "pwa-icons";
             runtimeInputs = with pkgs; [
-              curl
-              coreutils
-              findutils
+              # Webpage analysis and parsing tools
               file
-              gnused
               gnugrep
+              gnused
+              coreutils
+
+              # Tools for fetching webpages and icons
+              curl
+              cacert
             ];
             text = builtins.readFile ./download_icons.sh;
           };
@@ -88,7 +90,7 @@
       };
 
       # Provide an overlay to add it to pkgs
-      overlays.pwa-icon-downloader = final: prev: {
+      overlays.pwa-icons = final: prev: {
         downloadWebAppIcon = mkDownloadWebAppIcon final;
       };
 
@@ -103,13 +105,11 @@
               self.packages.${system}.default
               shellcheck
             ];
-
-            languages.sh.enable = true;
           };
         }
       );
 
-      homeManagerModules.pwa-icon-downloader =
+      homeManagerModules.pwa-icons =
         { pkgs, ... }:
         {
           # Inject the helper into module arguments
