@@ -32,7 +32,7 @@
           finalHash = if hash != "" then hash else sha256;
 
           # We need the downloader as a dependency
-          downloader = self.packages.${pkgs.system}.default;
+          downloader = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         in
         pkgs.stdenv.mkDerivation {
           name = "${builtins.replaceStrings [ ":" "/" " " ] [ "_" "_" "_" ] domain}-icon.ico";
